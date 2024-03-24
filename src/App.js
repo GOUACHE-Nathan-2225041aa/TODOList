@@ -1,62 +1,111 @@
-import React, {useEffect, useState} from 'react';
+// App.js
+import React, { useEffect, useState } from 'react';
 import './App.css';
+import Header from './Header';
+import Footer from "./Footer";
+import TaskModal from "./TaskModal";
 
 const items = [
-    { id: 1, text: "Learn JavaScript", done: false },
-    { id: 2, text: "Learn React", done: false },
-    { id: 3, text: "Play around in JSFiddle", done: true },
-    { id: 4, text: "Build something awesome", done: true }
-];
+    { text: "Learn JavaScript", isChecked: false },
+    { text: "Learn React", isChecked: false },
+    { text: "Play around in JSFiddle", isChecked: true },
+    { text: "Build something awesome", isChecked: true }
+]
 
-function App() {
+export function App() {
+    const [itemsDone, setItemsDone] = useState(0);
     const [todoItems, setTodoItems] = useState(items);
     const [newTask, setNewTask] = useState("");
+    const [filteredItems, setFilteredItems] = useState(items);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const handleChange = (id) => {
-        setTodoItems(todoItems.map(item => {
-            if (item.id === id) {
-                return { ...item, done: !item.done };
-            }
-            return item;
-        }));
-    };
 
-    const handleAddTask = () => {
+
+    const handleChange = (index) => {
+        const updatedItems = [...todoItems];
+        updatedItems[index] = { ...updatedItems[index], isChecked: !updatedItems[index].isChecked };
+        setTodoItems(updatedItems);
+        setItemsDone(updatedItems.filter(item => item.isChecked).length);
+        setFilteredItems(updatedItems)
+        handleSave();
+    }
+
+    const handleAddTask = (newTask) => {
         if (newTask.trim() !== "") {
-            const newItem = {
-                id: todoItems[todoItems.length-1].id + 1   ,
-                text: newTask,
-                done: false
-            };
-            setTodoItems([...todoItems, newItem]);
-            setNewTask(""); // Clear input after adding task
+            const newItem = { text: newTask, isChecked: false };
+            setTodoItems([...todoItems, newItem])
+            setFilteredItems([...todoItems, newItem]);
+            setNewTask("");
+            handleCloseModal();
+            handleSave();
         }
-    };
+    }
 
-    const handleDeletion = (id) => {
-        todoItems.splice(id-1, 1);
-        setTodoItems(
-            todoItems.map(item => {
-                return item;
-            })
-        );
-        console.log(todoItems)
+    const handleDeletion = (index) => {
+        const updatedItems = [...todoItems];
+        if (updatedItems[index].isChecked) {
+            setItemsDone(itemsDone - 1);
+        }
+        updatedItems.splice(index, 1);
+        setTodoItems(updatedItems);
+        setFilteredItems(updatedItems)
+        handleSave();
     }
 
     const handleSave = () => {
-        localStorage.setItem("taskList", JSON.stringify(todoItems))
+        localStorage.setItem("taskList", JSON.stringify(todoItems));
     }
 
     const handleLoad = () => {
-        let taskList
-        try {
-            const taskListJson = localStorage.getItem("taskList")
-            taskList = JSON.parse(taskListJson)
+        const taskListJson = localStorage.getItem("taskList");
+        const taskList = JSON.parse(taskListJson) || items;
+        const currentItemsDone = taskList.filter(item => item.isChecked).length;
+        setItemsDone(currentItemsDone);
+        setTodoItems(taskList);
+        setFilteredItems(taskList);
+    }
+
+    const handleSearch = (searchTerm) => {
+        const filtered = todoItems.filter(item =>
+            item.text.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredItems(filtered);
+    }
+
+    const up = (index) => {
+        if(todoItems[index-1] !== undefined){
+            const updatedItems = [...todoItems];
+
+            let temp = updatedItems[index-1]
+            updatedItems[index-1] = updatedItems[index]
+            updatedItems[index] = temp
+
+            setTodoItems(updatedItems);
+            setFilteredItems(updatedItems)
+            handleSave();
         }
-        catch (e) {
-            taskList = items
+    }
+
+    const down = (index) => {
+        if(todoItems[index+1] !== undefined){
+            const updatedItems = [...todoItems];
+
+            let temp = updatedItems[index+1]
+            updatedItems[index+1] = updatedItems[index]
+            updatedItems[index] = temp
+
+            setTodoItems(updatedItems);
+            setFilteredItems(updatedItems)
+            handleSave();
         }
-        setTodoItems(taskList)
+    }
+
+    const handleOpenModal = () => {
+        setIsModalOpen(true);
+    }
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
     }
 
     useEffect(() => {
@@ -65,27 +114,33 @@ function App() {
 
     return (
         <div>
-            <button onClick={handleSave}>Save list</button><button onClick={handleLoad}>Load list</button>
+            <Header itemsDone={itemsDone} todoItems={todoItems.length}/>
+            <button onClick={handleSave}>Save list</button>
+            <button onClick={handleLoad}>Load list</button>
             <h2>Todos:</h2>
             <ol>
-                {todoItems.map(item => (
-                    <li key={item.id}>
+                {filteredItems.map((item, index) => (
+                    <li key={index}>
                         <label>
-                            <input type="checkbox" onChange={() => handleChange(item.id)} checked={item.done} />
-                            <span className={item.done ? "done" : ""}>{item.text}</span>
-                            <button onClick={() => handleDeletion(item.id)}>Delete</button>
+                            <input type="checkbox" onChange={() => handleChange(index)} checked={item.isChecked}/>
+                            <span className={item.isChecked ? "isChecked" : ""}>{item.text}</span>
+                            <button onClick={() => handleDeletion(index)}>Delete</button>
+                            <button onClick={() => up(index)}>↑</button>
+                            <button onClick={() => down(index)}>↓</button>
                         </label>
                     </li>
                 ))}
             </ol>
-            <input
-                type="text"
-                placeholder="Enter new task"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-            /><button onClick={handleAddTask}>Add task</button>
+            <button onClick={handleOpenModal}>Add Task Modal</button>
+            <TaskModal isOpen={isModalOpen} onRequestClose={handleCloseModal} onAddTask={handleAddTask}/>
+            <Footer
+                onSearch={handleSearch}
+                isModalOpen={isModalOpen}
+                onRequestClose={handleCloseModal}
+                onAddTask={handleAddTask}
+            />
         </div>
-    );
+    )
 }
 
 export default App;
